@@ -12,7 +12,7 @@ maxPixelValue = f.readline()
 ####function to create 2d array of pixels ####
 ####each pixel is an array of 3 values [r,g,b]####
 def create2DArr(file):
-    #create zero'd array of [width,height] size to store data
+    #create zero'd array  to store data
     outputArr = [[None]*width for x in range(height)]
     count=0#keep track of which entry (every 3 need to be grouped as one pixel)
     pixel=[0,0,0]
@@ -42,8 +42,8 @@ def writeImage(image,name,dim=dimensions):#setting dim to default value for most
     #first get the headers 
     data+=filetype+comment+dim[0]+" "+dim[1]+maxPixelValue
     #then handle adding each pixel value to our string
-    for i in range(height):
-        for j in range(width):
+    for i in range(int(dim[1])):
+        for j in range(int(dim[0])):
             for y in range(3):
                 data+=str(image[i][j][y])+"\n"
     #finally write our file
@@ -91,36 +91,89 @@ writeImage(gsP,"percentChannelsGrayScale.ppm")
 
 ####SCALING SECTION####
 #NN
-'''
+
 def NN(xfactor,yfactor,image):
     newWidth = int(width*xfactor)
     newHeight = int(height*yfactor)
-    xratio = width/newWidth
-    yratio=height/newHeight
     outArr = [[None]*newWidth for x in range(newHeight)]
     for i in range(newHeight):
         for j in range(newWidth):
-            x = int(round(float(j)/float(newWidth)*float(width)))
-            y = int(round(float(i)/float(newHeight)*float(height)))
-            x = min(x,width-1) #using min here to account for rounding issues
+            x = int(round(j/newWidth*width))
+            y = int(round(i/newHeight*height))
+            x = min(x,width-1)
             y = min(y,height-1)
             pixel = image[y][x]
             outArr[i][j]=pixel
     return outArr,newWidth,newHeight #returning new dimensions here to add to header of image
-'''
+
+#call our NN function and write the image
+#nearestN,sWidth,sHeight = NN(2,2,originalImage)
+#writeImage(nearestN,"NNscaled.ppm",[str(sWidth),str(sHeight)+"\n"])
+
+#interpolation
+
+def bilinear(xfactor, yfactor, image):
+	newWidth = int(width*xfactor)
+	newHeight = int(height*yfactor)
+	outArr = [[None]*newWidth for x in range(newHeight)]
+	xratio = (float(width))/newWidth
+	yratio = (float(height))/newHeight
+	for i in range(newHeight):
+		for j in range(newWidth):
+			x = int(xratio*j)
+			y = int(yratio*i)
+			x = min(x, width-2)
+			y = min(y, height-2)
+			xdiff = xratio*j -x
+			ydiff = yratio*i -y
+			#now get our pixels as a,b,c,d
+			a = image[y][x] 
+			b = image[y][x+1] 
+			c = image[y+1][x] 
+			d = image[y+1][x+1]
+			#now calculate values for each channel in pixel
+			red = int((a[0] * (1-xdiff) * (1-ydiff)) + (b[0] * (xdiff) * (1-ydiff)) + (c[0] * ydiff * (1-xdiff)) + (d[0] * (xdiff * ydiff)))
+			green = int((a[1] * (1-xdiff) * (1-ydiff)) + (b[1] * (xdiff) * (1-ydiff)) + (c[1] * ydiff * (1-xdiff)) + (d[1] * (xdiff * ydiff)))
+			blue = int((a[2] * (1-xdiff) * (1-ydiff)) + (b[2] * (xdiff) * (1-ydiff)) + (c[2] * ydiff * (1-xdiff)) + (d[2] * (xdiff * ydiff)))
+			#add these new values to the output image
+			outArr[i][j] = [red,green,blue]
+	return outArr,newWidth,newHeight
+	
+bil, sWidth, sHeight = bilinear(2,2,originalImage)
+writeImage(bil,"bilinearInter.ppm",[str(sWidth),str(sHeight)+"\n"])
+
+####ROTATION####
+def rotate(bmp, r, mx=0, my=0, filename=None, interpol=None):
+    """Rotate bitmap bmp r radians clockwise from the center. Move it mx, my."""
+
+    # Get the bitmap's original dimensions and calculate the new ones
+    oh, ow = len(bmp), len(bmp[0])
+    nwl = ow * math.cos(r)
+    nwr = oh * math.sin(r)
+    nhl = ow * math.sin(r)
+    nhu = oh * math.cos(r)
+    nw, nh = int(math.ceil(nwl + nwr)), int(math.ceil(nhl+nhu))
+    cx, cy = ow/2.0 - 0.5, oh/2.0 - 0.5 # The center of the image
+    # Some rotations yield pixels offscren. They will be mapped anyway, so if 
+    # the user moves the image he gets what was offscreen. 
+    xoffset, yoffset = int(math.ceil((ow-nw)/2.0)), int(math.ceil((oh-nh)/2.0))
+    for x in xrange(xoffset,nw):
+        for y in xrange(yoffset,nh):
+            ox, oy = affine_t(x-cx, y-cy, *mrotate(-r, cx, cy))
+            if ox > -1 and ox < ow and oy > -1 and oy < oh:
+                pt = bilinear(bmp, ox, oy) if interpol else nn(bmp, ox, oy)
+                draw.point([(x+mx,y+my),],fill=pt)
+    if filename is not None:
+        im.save(filename)
 import math
-def NN(image,w2,h2):
-    outArr = [[None]*w2 for x in range(h2)]
-    tx = width/w2
-    ty = height/h2
-    for i in range(0,h2):
-        for j in range(0,w2):
-            x = math.ceil(j*tx)-1
-            y = math.ceil(i*ty)-1
-            outArr[i][j] = image[y][x]
-    return outArr,w2,h2
-#nearestN,sWidth,sHeight = NN(1.2,1.2,originalImage)
-nearestN,sWidth,sHeight = NN(originalImage,408,360)
-print(sWidth)
-print(sHeight)
-writeImage(nearestN,"NNscaled",[str(sWidth),str(sHeight)+"\n"])
+def rotate(image, angle, xfocus=0, yfocus=0):
+	#calculate new dimensions first with weird maths
+	wl = width*math.cos(r)
+	wr = height*math.sin(r)
+	hl = width*math.sin(r)
+	hu = height*math.cos(r)
+	newWidth = int(math.ceil(wl+wr))
+	newHeight = int(math.ceil(hl+hu))
+	#now find the center of the image with more maths??
+	xC = width/2 - 0.5
+	xY = height/2 - 0.5
