@@ -137,43 +137,42 @@ def bilinear(xfactor, yfactor, image):
 			blue = int((a[2] * (1-xdiff) * (1-ydiff)) + (b[2] * (xdiff) * (1-ydiff)) + (c[2] * ydiff * (1-xdiff)) + (d[2] * (xdiff * ydiff)))
 			#add these new values to the output image
 			outArr[i][j] = [red,green,blue]
+
 	return outArr,newWidth,newHeight
 	
-bil, sWidth, sHeight = bilinear(2,2,originalImage)
-writeImage(bil,"bilinearInter.ppm",[str(sWidth),str(sHeight)+"\n"])
+#bil, sWidth, sHeight = bilinear(2,2,originalImage)
+#writeImage(bil,"bilinearInter.ppm",[str(sWidth),str(sHeight)+"\n"])
 
 ####ROTATION####
-def rotate(bmp, r, mx=0, my=0, filename=None, interpol=None):
-    """Rotate bitmap bmp r radians clockwise from the center. Move it mx, my."""
 
-    # Get the bitmap's original dimensions and calculate the new ones
-    oh, ow = len(bmp), len(bmp[0])
-    nwl = ow * math.cos(r)
-    nwr = oh * math.sin(r)
-    nhl = ow * math.sin(r)
-    nhu = oh * math.cos(r)
-    nw, nh = int(math.ceil(nwl + nwr)), int(math.ceil(nhl+nhu))
-    cx, cy = ow/2.0 - 0.5, oh/2.0 - 0.5 # The center of the image
-    # Some rotations yield pixels offscren. They will be mapped anyway, so if 
-    # the user moves the image he gets what was offscreen. 
-    xoffset, yoffset = int(math.ceil((ow-nw)/2.0)), int(math.ceil((oh-nh)/2.0))
-    for x in xrange(xoffset,nw):
-        for y in xrange(yoffset,nh):
-            ox, oy = affine_t(x-cx, y-cy, *mrotate(-r, cx, cy))
-            if ox > -1 and ox < ow and oy > -1 and oy < oh:
-                pt = bilinear(bmp, ox, oy) if interpol else nn(bmp, ox, oy)
-                draw.point([(x+mx,y+my),],fill=pt)
-    if filename is not None:
-        im.save(filename)
 import math
-def rotate(image, angle, xfocus=0, yfocus=0):
-	#calculate new dimensions first with weird maths
-	wl = width*math.cos(r)
-	wr = height*math.sin(r)
-	hl = width*math.sin(r)
-	hu = height*math.cos(r)
-	newWidth = int(math.ceil(wl+wr))
-	newHeight = int(math.ceil(hl+hu))
-	#now find the center of the image with more maths??
-	xC = width/2 - 0.5
-	xY = height/2 - 0.5
+
+def rotate(image, angle):
+    radians = (2*math.pi *angle)/360
+    cos=math.cos(radians)
+    sin = math.sin(radians)
+    x0 = 0.5*(width)
+    y0 = 0.5*(height)
+    nwl = width*cos
+    nwr = height*sin
+    nhl = width*sin
+    nhu = height * cos
+    newWidth = int(math.ceil(nwl+nwr))
+    newHeight = int(math.ceil(nhl+nhu))
+    xoffset, yoffset = int(math.ceil((width-newWidth)/2.0)), int(math.ceil((height-newHeight)/2.0))
+    outArr = [[[255,255,255]]*width for x in range(height)]
+
+    for y in range(height):
+        for x in range(width):
+            #x2 = cos(r) *(x1-x0)-sin(r)*(y1-y0)+x0
+            #y2 = sin(r) * (x1-x0)+ cos(r)*(y1-y0)+y0
+            #cosr=cos sinr=sin x1=x x0=x0 y1=y y0=y0
+            a = x-x0
+            b = y-y0
+            xx = int(a*cos-b*sin+x0)
+            yy = int(a*sin+b*cos+y0)
+            if(xx>=0 and xx<width and yy>=0 and yy<height):
+                outArr[y][x] = image[yy][xx]
+    return outArr,width,height
+rotate, sWidth, sHeight = rotate(originalImage,45)
+writeImage(rotate,"rotate.ppm",[str(sWidth),str(sHeight)+"\n"])
