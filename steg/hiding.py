@@ -8,7 +8,8 @@ width=int(dimensions[0])
 height = int(dimensions[1])
 maxPixelValue = f.readline()
 ####end read header####
-text = input("enter string to hide")
+text = input("enter string to hide\n")
+print("Hiding String in path.ppm as hidden.ppm \n\n")
 #we assume we have a grayed image
 values=f.readlines()
 for i in range(len(values)):
@@ -67,5 +68,5 @@ def subtract(orig, new):
         hiddenNums.append(value)
     return hiddenNums
 
-    
+print("subtracting values from image to determine hidden message\n\n")
 print(convertDecToString(subtract(values,newImage)))
